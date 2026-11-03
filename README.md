@@ -1,5 +1,7 @@
 # Play Integrity STRONG on a rooted phone — TEESimulator + RKP keybox guide
 
+> **Want it all by taps, no file editing?** → **[DUCK-TOOLBOX-GUI.md](DUCK-TOOLBOX-GUI.md)** (Duck ToolBox only, no PIF module).
+
 A working, tested setup for passing **MEETS_STRONG_INTEGRITY** on a rooted Android phone with an
 unlocked bootloader, using your **own device-minted RKP keybox** instead of hunting leaked keyboxes.
 
