@@ -13,6 +13,7 @@ unlocked bootloader, using your **own device-minted RKP keybox** instead of hunt
 - Rooted phone (KernelSU / KernelSU-Next / Magisk / APatch)
 - A Zygisk implementation
 - ADB on a PC (optional, but makes debugging much easier)
+- For SUSFS root hiding: a kernel with SUSFS built in → **[KERNEL-SUSFS.md](KERNEL-SUSFS.md)** (prebuilt or build for your ROM)
 
 ## Modules
 
