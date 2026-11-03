@@ -3,7 +3,7 @@
 A working, tested setup for passing **MEETS_STRONG_INTEGRITY** on a rooted Android phone with an
 unlocked bootloader, using your **own device-minted RKP keybox** instead of hunting leaked keyboxes.
 
-> Tested on: OnePlus Nord 4 (SM7675), Axion OS (Android 16), KernelSU-Next + SUSFS, November 2026.
+> Tested on: OnePlus Nord 4 (**avalon**, SM7675), Axion OS (Android 16), KernelSU-Next + SUSFS, November 2026.
 > Integrity setups break often. If something here stops working, check the troubleshooting section first.
 
 ---
@@ -31,6 +31,7 @@ Debug app: **[Duck Detector](https://github.com/eltavine/Duck-Detector-Refactori
 
 - **Don't run more than one keystore hook.** Pick TEESimulator only. Remove Tricky Store, AlwaysStrong,
   "Premium Integrity" and similar — they fight each other.
+- **Don't remove the PIF module unless another PIF engine is actually configured.** Duck ToolBox's built-in engine is off by default (no config) — removing the module leaves nothing spoofing.
 - **Don't enable two PIF engines.** Duck ToolBox has a built-in PIF engine; if you use the PIF module, leave Duck's engine off (or the other way round).
 - **Turn off your ROM's built-in spoofing** (Pixel props / keybox / PIF options in ROM settings) — leave them all empty/disabled.
 - **Install one module per reboot.** Flashing several at once can bootloop and KSU safe mode will remove them.
@@ -101,9 +102,29 @@ see what GMS sees), and any app whose biometric / UPI / passkey login fails. On 
 PIF / Duck ToolBox → Play Integrity → **Fetch Pixel builds** → apply config.
 
 - A **Pixel Canary / Beta** fingerprint worked for STRONG; a stable one only gave BASIC in testing.
-- Check the device in the generated config matches what you picked (one tester got a different Pixel
-  than shown in the list — re-fetch if so).
+- **`MODEL` / `MANUFACTURER` must belong to the same Pixel as `FINGERPRINT`.** A tester picked a Pixel 6a
+  fingerprint, but Duck's "Fill matching properties" filled in a Pixel 10-series model → mismatch → BASIC.
+  If that happens, skip the fill button and write `/data/adb/pif.prop` yourself.
 - Note the fingerprint's `SECURITY_PATCH` and use that date in step 3.
+
+Working `/data/adb/pif.prop` (Nord 4, November 2026 — Canary fingerprints get rotated, fetch a newer one if this stops working):
+
+```properties
+FINGERPRINT=google/bluejay_beta/bluejay:CANARY/ZP11.260918.007/16484274:user/release-keys
+MANUFACTURER=Google
+MODEL=Pixel 6a
+SECURITY_PATCH=2026-10-05
+DEVICE_INITIAL_SDK_INT=32
+spoofBuild=true
+spoofProps=true
+spoofProvider=false
+spoofSignature=true
+spoofVendingBuild=true
+spoofVendingSdk=false
+DEBUG=false
+```
+
+With this one, TEESimulator `patchLevel.system` = `"2026-10-05"`.
 
 ```sh
 su -c 'grep -h SECURITY_PATCH /data/adb/pif.prop /data/adb/modules/playintegrityfix/*.prop 2>/dev/null'
@@ -127,6 +148,7 @@ Then check with any Play Integrity checker app (SPIC, Play Integrity API Checker
 |---|---|---|
 | **BASIC only** | `mode: patch`, `system` patch = `"today"`, or no keybox in `/data/adb/teesim/` | Step 3 + verify keybox path |
 | BASIC only, config correct | Stable PIF fingerprint | Fetch a Canary/Beta fingerprint, re-pin patch date |
+| BASIC only, fingerprint looks right | `MODEL` in pif.prop is a different Pixel than `FINGERPRINT` | Fix pif.prop by hand (step 4) |
 | **Empty verdict** (not even BASIC, everything UNEVALUATED) | `ro.boot.vbmeta.digest` is all zeros (unlocked bootloader) | Set it to a real digest via `resetprop` at boot (SUSFS module and some integrity modules do this) |
 | Device RKP Issuer fails (`-18`, `-20`) | Broken TEE/KeyMint on your ROM | Try another ROM, or on Qualcomm see note below. Meanwhile any valid keybox works in TEESimulator |
 | Duck Detector flags **SELinux** | ROM is permissive / leaks SELinux state | ROM problem — modules can't fix it. Check `getenforce`; use an enforcing build |

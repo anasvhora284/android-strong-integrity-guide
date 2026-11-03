@@ -7,6 +7,12 @@ and how to install the SUSFS userspace module after.
 > (LineageOS kernel `6.1.176-g0dfed1b9f5b7`), KernelSU-Next 33388 + SUSFS v2.3.0. 907 vendor modules, 0 CRC
 > mismatches, flashed and daily-driven.
 
+**Nord 4 (avalon) on a Lineage-based ROM (Axion, Luna…):** kernel source is
+`LineageOS/android_kernel_oneplus_sm8650` + `sm8650-modules` + `sm8650-devicetrees` — the worked example below
+is exactly your case; only the commit (from your `uname -r`) changes. If your `uname -r` is **identical** to
+another avalon user's, their built image may work for you too — but only after the CRC check (step 4) passes
+against **your** ROM's modules, then `fastboot boot` test.
+
 **Always keep a copy of your stock `boot` image. Test with `fastboot boot` (RAM only) before `fastboot flash`.**
 
 ---
