@@ -88,6 +88,17 @@ Run a Play Integrity checker (SPIC etc.). Expected: BASIC + DEVICE + **STRONG**.
 | **Prepare for hardware-backed attestation** | Only sets `spoofProvider=0`. |
 | **Migrate and preview** | Same as preview, also converts old PIF formats. |
 
+## Duck Detector: Bootloader + TEE "Danger" (boot hash mismatch)
+
+If Duck Detector says *Attested verifiedBootHash did not match ro.boot.vbmeta.digest*, the `ro.boot.vbmeta.digest`
+prop doesn't match the boot hash TEESimulator attests.
+
+- **Taps:** Tricky Store → **⋮** → **Prop Settings** → **Boot Hash** → paste the *Attested boot hash* from Duck
+  Detector's Bootloader section → **Save** → reboot. Redo after every ROM update.
+- **Automatic (one-time setup, needs a file copy):** put [`tools/sync_boot_hash.sh`](tools/sync_boot_hash.sh) in
+  `/data/adb/service.d/` (permissions 755). Every boot it copies TEESimulator's harvested hash into Duck's boot-hash
+  file and the prop, so it stays right after ROM updates.
+
 ## When it stops working
 
 | When | Do |
