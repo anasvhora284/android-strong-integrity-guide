@@ -28,6 +28,8 @@ unlocked bootloader, using your **own device-minted RKP keybox** instead of hunt
 
 > **Why no standalone PlayIntegrityFix module?** On a current KernelSU-Next + ReZygisk + Android 16 stack it couldn't reach STRONG in testing: v4.9-inject-s doesn't inject at all, and the Fork injects the fingerprint into GMS but **DEVICE integrity still fails** — it doesn't reach the isolated DroidGuard worker. Duck ToolBox's engine (full injection) does. Use Duck's engine; don't stack a separate PIF module on top. On older stacks the standalone module may still work — but it's not needed here.
 
+> **Tip:** Duck ToolBox can **install and manage TEESimulator for you** from its WebUI — you don't have to flash it separately. It's still a required, distinct component (Duck doesn't do keystore attestation itself); Duck just deploys and configures it.
+
 Debug app: **[Duck Detector](https://github.com/eltavine/Duck-Detector-Refactoring/tags)** — shows exactly what is detectable.
 
 ### Don't
