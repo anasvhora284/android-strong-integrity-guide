@@ -22,10 +22,11 @@ unlocked bootloader, using your **own device-minted RKP keybox** instead of hunt
 | Module | Why | Link |
 |---|---|---|
 | **TEESimulator** | Signs key attestations with a keybox for selected apps (the part that gives STRONG) | [JingMatrix/TEESimulator](https://github.com/JingMatrix/TEESimulator/releases) |
-| **PlayIntegrityFix (inject-s)** | Spoofs a Pixel fingerprint for GMS (gives BASIC/DEVICE) | [KOWX712/PlayIntegrityFix](https://github.com/KOWX712/PlayIntegrityFix/releases) |
-| **Duck ToolBox** | WebUI to manage the above + **Device RKP Issuer** (mints your keybox) | [eltavine/Duck-ToolBox](https://github.com/eltavine/Duck-ToolBox/releases) |
-| **Zygisk** (one of) | Needed by PIF | [ReZygisk](https://github.com/PerformanC/ReZygisk/releases) / [Zygisk Next](https://github.com/Dr-TSNG/ZygiskNext/releases) |
+| **Duck ToolBox** | WebUI for **Device RKP Issuer** (mints your keybox) + its built-in **Play Integrity engine** (spoofs the Pixel fingerprint) | [eltavine/Duck-ToolBox](https://github.com/eltavine/Duck-ToolBox/releases) |
+| **Zygisk** (one of) | Needed by the injection engine | [ReZygisk](https://github.com/PerformanC/ReZygisk/releases) / [Zygisk Next](https://github.com/Dr-TSNG/ZygiskNext/releases) |
 | SUSFS (KernelSU only, optional) | Root hiding | [sidex15/susfs4ksu-module](https://github.com/sidex15/susfs4ksu-module/releases) |
+
+> **Why no standalone PlayIntegrityFix module?** On a current KernelSU-Next + ReZygisk + Android 16 stack it couldn't reach STRONG in testing: v4.9-inject-s doesn't inject at all, and the Fork injects the fingerprint into GMS but **DEVICE integrity still fails** — it doesn't reach the isolated DroidGuard worker. Duck ToolBox's engine (full injection) does. Use Duck's engine; don't stack a separate PIF module on top. On older stacks the standalone module may still work — but it's not needed here.
 
 Debug app: **[Duck Detector](https://github.com/eltavine/Duck-Detector-Refactoring/tags)** — shows exactly what is detectable.
 
@@ -33,8 +34,7 @@ Debug app: **[Duck Detector](https://github.com/eltavine/Duck-Detector-Refactori
 
 - **Don't run more than one keystore hook.** Pick TEESimulator only. Remove Tricky Store, AlwaysStrong,
   "Premium Integrity" and similar — they fight each other.
-- **Don't remove the PIF module unless another PIF engine is actually configured.** Duck ToolBox's built-in engine is off by default (no config) — removing the module leaves nothing spoofing.
-- **Don't enable two PIF engines.** Duck ToolBox has a built-in PIF engine; if you use the PIF module, leave Duck's engine off (or the other way round).
+- **Don't run two fingerprint engines.** Use Duck ToolBox's built-in Play Integrity engine only. If you also installed a standalone PlayIntegrityFix module, remove it — two engines fight and neither is reliable.
 - **Turn off your ROM's built-in spoofing** (Pixel props / keybox / PIF options in ROM settings) — leave them all empty/disabled.
 - **Install one module per reboot.** Flashing several at once can bootloop and KSU safe mode will remove them.
 
@@ -44,7 +44,7 @@ Debug app: **[Duck Detector](https://github.com/eltavine/Duck-Detector-Refactori
 
 ### 1. Flash modules
 
-Flash Zygisk → reboot → TEESimulator → reboot → PlayIntegrityFix → reboot → Duck ToolBox → reboot.
+Flash Zygisk → reboot → TEESimulator → reboot → Duck ToolBox → reboot.
 
 ### 2. Mint your own keybox (Device RKP Issuer)
 
@@ -74,7 +74,7 @@ Edit `/data/adb/teesim/config.json` (or the TEESimulator / Duck WebUI). **These 
 | Setting | Set to | If wrong |
 |---|---|---|
 | `mode` | **`"generation"`** | Default `patch` uses the real TEE, which reports the bootloader as **unlocked** → BASIC only |
-| `patchLevel.system` | **The same date as your PIF `SECURITY_PATCH`** (e.g. `"2026-10-05"`) | `"today"` becomes the current month; if PIF's fingerprint is from last month → mismatch → BASIC only |
+| `patchLevel.system` | **The same date as your fingerprint's `SECURITY_PATCH`** (e.g. `"2026-11-05"`) | `"today"` becomes the current month; if the fingerprint is from last month → mismatch → BASIC only |
 
 Example profile:
 
@@ -85,7 +85,7 @@ Example profile:
     "default": {
       "mode": "generation",
       "keybox": "keybox.xml",
-      "patchLevel": { "system": "2026-10-05", "vendor": "YYYY-MM-05", "boot": "YYYY-MM-05" },
+      "patchLevel": { "system": "2026-11-05", "vendor": "YYYY-MM-05", "boot": "YYYY-MM-05" },
       "apps": [
         "com.google.android.gms",
         "com.android.vending"
@@ -99,38 +99,19 @@ Example profile:
 see what GMS sees), and any app whose biometric / UPI / passkey login fails. On the test phone Google Pay
 (`com.google.android.apps.nbu.paisa.user`), CRED, GitHub and MS Authenticator are in the list and all work.
 
-### 4. PIF fingerprint
+### 4. Fingerprint (Duck ToolBox Play Integrity engine)
 
-PIF / Duck ToolBox → Play Integrity → **Fetch Pixel builds** → apply config.
+Duck ToolBox WebUI → **Play Integrity** → **Fetch Pixel builds** → pick one → apply. Turn the engine **on**.
+Full fetch/patch-date walkthrough: **[DUCK-TOOLBOX-GUI.md § 3b](DUCK-TOOLBOX-GUI.md)**. The rules that matter:
 
-- A **Pixel Canary / Beta** fingerprint worked for STRONG; a stable one only gave BASIC in testing.
-- **`MODEL` / `MANUFACTURER` must belong to the same Pixel as `FINGERPRINT`.** A tester picked a Pixel 6a
-  fingerprint, but Duck's "Fill matching properties" filled in a Pixel 10-series model → mismatch → BASIC.
-  If that happens, skip the fill button and write `/data/adb/pif.prop` yourself.
-- Note the fingerprint's `SECURITY_PATCH` and use that date in step 3.
+- Use a **Google-accepted build**. A brand-new fingerprint can give BASIC until Google accepts it; if so, pick an
+  older one that's known-good (e.g. a Pixel 9a `CP4A.*` or `ZP11.*` build worked in testing).
+- **`MODEL` / `MANUFACTURER` must match the Pixel the `FINGERPRINT` belongs to.** Don't mix a Pixel 9a fingerprint
+  with a Pixel 10 model — mismatch → BASIC. If Duck's "fill" guesses wrong, correct it by hand.
+- Note the fingerprint's **`SECURITY_PATCH`** — set TEESimulator `patchLevel.system` (step 3) to the **same date**,
+  or you stay at BASIC.
 
-Working `/data/adb/pif.prop` (Nord 4, November 2026 — Canary fingerprints get rotated, fetch a newer one if this stops working):
-
-```properties
-FINGERPRINT=google/bluejay_beta/bluejay:CANARY/ZP11.260918.007/16484274:user/release-keys
-MANUFACTURER=Google
-MODEL=Pixel 6a
-SECURITY_PATCH=2026-10-05
-DEVICE_INITIAL_SDK_INT=32
-spoofBuild=true
-spoofProps=true
-spoofProvider=false
-spoofSignature=true
-spoofVendingBuild=true
-spoofVendingSdk=false
-DEBUG=false
-```
-
-With this one, TEESimulator `patchLevel.system` = `"2026-10-05"`.
-
-```sh
-su -c 'grep -h SECURITY_PATCH /data/adb/pif.prop /data/adb/modules/playintegrityfix/*.prop 2>/dev/null'
-```
+The current fingerprint is shown in the Duck ToolBox WebUI (Play Integrity tab).
 
 ### 5. Apply (no reboot needed)
 
@@ -149,8 +130,8 @@ Then check with any Play Integrity checker app (SPIC, Play Integrity API Checker
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | **BASIC only** | `mode: patch`, `system` patch = `"today"`, or no keybox in `/data/adb/teesim/` | Step 3 + verify keybox path |
-| BASIC only, config correct | Stable PIF fingerprint | Fetch a Canary/Beta fingerprint, re-pin patch date |
-| BASIC only, fingerprint looks right | `MODEL` in pif.prop is a different Pixel than `FINGERPRINT` | Fix pif.prop by hand (step 4) |
+| BASIC only, config correct | Fingerprint not Google-accepted yet | Fetch a known-good (older) Pixel build, re-pin patch date (step 4) |
+| BASIC only, fingerprint looks right | `MODEL` / `MANUFACTURER` is a different Pixel than `FINGERPRINT` | Correct the model to match (step 4) |
 | **Empty verdict** (not even BASIC, everything UNEVALUATED) | `ro.boot.vbmeta.digest` is all zeros (unlocked bootloader) | Set it to a real digest via `resetprop` at boot (SUSFS module and some integrity modules do this) |
 | Device RKP Issuer fails (`-18`, `-20`) | Broken TEE/KeyMint on your ROM | Try another ROM, or on Qualcomm see note below. Meanwhile any valid keybox works in TEESimulator |
 | Duck Detector flags **SELinux** | ROM is permissive / leaks SELinux state | ROM problem — modules can't fix it. Check `getenforce`; use an enforcing build |
@@ -158,7 +139,7 @@ Then check with any Play Integrity checker app (SPIC, Play Integrity API Checker
 | Biometric / app lock / passkey fails in some app | That app's keystore keys hit a broken real TEE | Add the app to the profile `apps` list, restart daemon, re-enroll biometric once |
 | Google Pay / UPI registration fails | Another keystore hook installed (AlwaysStrong / Tricky Store broke GPay in testing) | Keep only TEESimulator; add the app to `apps` |
 | Worked, then dropped after ~2 weeks | RKP keybox leaf expired | Re-mint (step 2) |
-| Dropped after a new month | Pinned patch date vs new PIF fingerprint | Re-fetch PIF, re-pin `system` date |
+| Dropped after a new month | Pinned patch date vs new fingerprint | Re-fetch the fingerprint, re-pin `system` date (steps 3–4) |
 
 ### Quick diagnosis dump
 
@@ -168,7 +149,6 @@ Run in `adb shell` → `su`, and share the output when asking for help:
 getenforce
 grep -E '"mode"|"system"|"keybox"' /data/adb/teesim/config.json
 ls -l /data/adb/teesim/keybox.xml /data/adb/tricky_store/keybox.xml 2>&1
-grep -h SECURITY_PATCH /data/adb/pif.prop /data/adb/modules/playintegrityfix/*.prop 2>/dev/null
 getprop ro.boot.vbmeta.digest
 ls /data/adb/modules
 tail -n 30 /data/adb/teesim/log/teesim.log
